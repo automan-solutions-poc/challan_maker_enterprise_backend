@@ -23,7 +23,7 @@ load_dotenv()
 # Neon connection URL (full URL with SSL)
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://neondb_owner:npg_sCUp8re2NYbR@ep-proud-brook-a4h4pqu0-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require"
+    
 )
 
 def get_db_connection():
