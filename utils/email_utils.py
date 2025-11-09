@@ -117,6 +117,91 @@ def send_challan_email(tenant_id, to_email, challan_data, pdf_path, image_paths=
         return False
 
 
+
+def send_Update_challan_email(tenant_id, to_email, challan_data, pdf_path, image_paths=[]):
+    """
+    Sends challan email with PDF + image attachments.
+    Supports tenant-based SMTP credentials + retry mechanism.
+    """
+    from app import create_app  # ✅ Import here to avoid circular dependency
+
+    try:
+        app = create_app()  # Create new Flask app for context
+        tenant_mail_cfg = get_tenant_mail_config(tenant_id)
+
+        # ✅ Configure tenant mail if available
+        if tenant_mail_cfg and tenant_mail_cfg.get("sender_email") and tenant_mail_cfg.get("sender_password"):
+            print(f"📧 Using tenant-specific email: {tenant_mail_cfg['sender_email']}")
+            mail_instance = Mail()
+            app.config.update({
+                "MAIL_SERVER": tenant_mail_cfg.get("mail_server", "smtp.gmail.com"),
+                "MAIL_PORT": tenant_mail_cfg.get("mail_port", 587),
+                "MAIL_USE_TLS": tenant_mail_cfg.get("use_tls", True),
+                "MAIL_USERNAME": tenant_mail_cfg["sender_email"],
+                "MAIL_PASSWORD": tenant_mail_cfg["sender_password"],
+                "MAIL_DEFAULT_SENDER": (
+                    tenant_mail_cfg.get("sender_name", "Service Center"),
+                    tenant_mail_cfg["sender_email"]
+                ),
+            })
+            mail_instance.init_app(app)
+        else:
+            print("⚠️ Tenant email not configured — using global sender.")
+            mail_instance = global_mail
+
+        with app.app_context():
+            msg = Message(
+                subject=f"Challan - {challan_data.get('challan_no', '')}",
+                recipients=[to_email],
+            )
+
+            # 🧾 Email Body
+            msg.html = f"""
+            <div style='font-family: Arial, sans-serif; color: #333'>
+                <h3>Dear {challan_data.get('customer_name', 'Customer')},</h3>
+                <p>Your service challan has been successfully updated.</p>
+                <p><b>Challan No:</b> {challan_data.get('challan_no')}<br/>
+                <b>Problem:</b> {challan_data.get('problem')}<br/>
+                <b>Serial No:</b> {challan_data.get('serial_number')}<br/>
+                <b>Accessories:</b> {', '.join(challan_data.get('accessories', []))}</p>
+                <p>Please find attached your challan PDF and related images.</p>
+                <p>Regards,<br/><b>{challan_data.get('company_name', 'Service Center')}</b></p>
+            </div>
+            """
+
+            # 📎 Attach PDF
+            if pdf_path and os.path.exists(pdf_path):
+                with open(pdf_path, "rb") as f:
+                    msg.attach(os.path.basename(pdf_path), "application/pdf", f.read())
+
+            # 📷 Attach images
+            for img_path in image_paths:
+                if img_path and os.path.exists(img_path):
+                    with open(img_path, "rb") as f:
+                        msg.attach(os.path.basename(img_path), "image/jpeg", f.read())
+
+            # 🌀 Retry Mechanism (3 attempts)
+            max_retries = 3
+            delay_seconds = 5
+            for attempt in range(1, max_retries + 1):
+                try:
+                    mail_instance.send(msg)
+                    print(f"✅ Email sent successfully to {to_email} (Attempt {attempt})")
+                    return True
+                except Exception as e:
+                    print(f"⚠️ Attempt {attempt} failed: {e}")
+                    if attempt < max_retries:
+                        print(f"⏳ Retrying in {delay_seconds} seconds...")
+                        time.sleep(delay_seconds)
+                    else:
+                        print("❌ All attempts failed. Email not sent.")
+                        return False
+
+    except Exception as e:
+        print("❌ Fatal email sending error:", e)
+        return False
+
+
 # ---------------------------------------------------------------------
 # 🔐 NEW: Send OTP Email
 # ---------------------------------------------------------------------

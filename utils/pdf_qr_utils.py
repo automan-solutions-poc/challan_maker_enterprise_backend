@@ -11,7 +11,8 @@ from jinja2 import Environment, FileSystemLoader
 # Ensure folders exist
 os.makedirs("static/qr_codes", exist_ok=True)
 os.makedirs("static/pdfs", exist_ok=True)
-baselocation_url="http://127.0.0.1:6001"
+baselocation_url="http://192.168.1.12:6001"
+# baselocation_url="http://127.0.0.1:6001"
 # ----------------------------------------------------
 # 🔹 Generate QR Code and Save
 # ----------------------------------------------------

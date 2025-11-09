@@ -13,7 +13,7 @@ from utils.pdf_qr_utils import generate_and_save_qr, generate_pdf
 from utils.email_utils import (
     send_challan_email,
     send_otp_email,
-    send_delivery_confirmation_email,
+    send_delivery_confirmation_email,send_Update_challan_email
 )
 
 challans_bp = Blueprint("challans", __name__)
@@ -670,7 +670,7 @@ def update_challan(challan_no):
                     pdf_full_path = candidate
             def _bg_resend():
                 try:
-                    send_challan_email(tenant_id, data.get("email"), pdf_data, pdf_full_path, [os.path.join(os.getcwd(), _safe_lstrip_path(p)) for p in image_paths])
+                    send_Update_challan_email(tenant_id, data.get("email"), pdf_data, pdf_full_path, [os.path.join(os.getcwd(), _safe_lstrip_path(p)) for p in image_paths])
                 except Exception as e:
                     print("❌ resend email error:", e)
             threading.Thread(target=_bg_resend, daemon=True).start()
