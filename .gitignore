@@ -1,0 +1,7 @@
+.env
+_pycache_
+*.pyc
+./routes/admin/_pycache_
+./routes/admin/*.pyc    
+./routes/tenant/_pycache_
+./routes/tenant/*.pyc

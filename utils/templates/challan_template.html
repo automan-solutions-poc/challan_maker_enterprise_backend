@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Challan - {{ data.challan_no }}</title>
+
+<style>
+  body {
+    font-family: {{ tenant_design.get("font_family", "Arial, sans-serif") }};
+    font-size: 13px;
+    color: #333;
+    margin: 0;
+    padding: 30px;
+    background-color: #fff;
+  }
+
+  /* ---------- HEADER ---------- */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 8px solid {{ tenant_design.get("theme_color", "#114e9e") }};
+    padding-top: 15px;
+    margin-bottom: 10px;
+  }
+
+  .company-left {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+  }
+
+  /* Logo container: keep some room so wide logos fit nicely */
+  .logo-wrap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;            /* keeps transparent logos readable */
+    padding: 4px;                        /* small padding so it doesn't touch edges */
+    border-radius: 6px;
+  }
+
+  /* Logo image rules - preserve aspect ratio, avoid cropping, keep color for print/PDF */
+  .logo {
+    max-width: 200px;     /* allow wider logos, but cap them */
+    max-height: 80px;     /* control height */
+    width: auto;
+    height: auto;
+    object-fit: contain;   /* keep full image visible */
+    display: block;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    background: transparent;
+
+    /* Ensure no CSS filter accidentally greys out the image */
+    filter: none !important;
+    -webkit-filter: none !important;
+
+    /* For PDF / Print renderers — preserve colors */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    color-adjust: exact;
+  }
+
+  .company-name {
+    color: {{ tenant_design.get("theme_color", "#114e9e") }};
+    font-size: 22px;
+    font-weight: bold;
+    margin: 0;
+  }
+
+  .tagline {
+    font-size: 13px;
+    color: #666;
+  }
+
+  .company-details {
+    line-height: 1.4;
+  }
+
+  .right-meta {
+    text-align: right;
+    font-size: 12px;
+  }
+
+  .right-meta strong {
+    color: {{ tenant_design.get("theme_color", "#114e9e") }};
+  }
+
+  /* ---------- SECTIONS ---------- */
+  h4.section-title {
+    color: {{ tenant_design.get("theme_color", "#114e9e") }};
+    font-weight: bold;
+    font-size: 15px;
+    margin-top: 25px;
+    border-bottom: 2px solid {{ tenant_design.get("theme_color", "#114e9e") }};
+    padding-bottom: 4px;
+  }
+
+  .info p { margin: 3px 0; }
+
+  /* ---------- TABLE ---------- */
+  .table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  .table th, .table td { border: 1px solid #ddd; padding: 8px; }
+  .table th {
+    background-color: {{ tenant_design.get("theme_color", "#114e9e") }};
+    color: #fff;
+  }
+
+  /* ---------- IMAGES ---------- */
+  .images { margin-top: 10px; display: flex; flex-wrap: wrap; }
+  .images img {
+    max-width: 120px;
+    height: auto;
+    margin: 4px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+  }
+
+  /* ---------- FOOTER ---------- */
+  .footer {
+    text-align: center;
+    font-size: 12px;
+    margin-top: 40px;
+    color: #666;
+    border-top: 1px solid #ddd;
+    padding-top: 10px;
+  }
+
+  /* ---------- WATERMARK ---------- */
+  .watermark {
+    position: fixed;
+    top: 40%;
+    left: 15%;
+    opacity: 0.08;
+    font-size: 100px;
+    color: #777;
+    transform: rotate(-30deg);
+    z-index: 0;
+    font-weight: bold;
+  }
+
+  /* ---------- QR CODE ---------- */
+  .qr { text-align: right; margin-top: 15px; }
+  .qr img { width: 90px; height: 90px; }
+</style>
+
+</head>
+
+<body>
+  {% if is_delivered %}
+  <div class="watermark">DELIVERED</div>
+  {% endif %}
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="company-left">
+      <div>
+        {% if logo_url %}
+        <img src="{{ logo_url }}" class="logo" alt="Logo" />
+      {% endif %}
+      </div>
+      <div class="company-details">
+        <h1 class="company-name">{{ tenant_design.get("company_name", "Company Name") }}</h1>
+        {% if tenant_design.get("tagline") %}
+          <div class="tagline">{{ tenant_design.get("tagline") }}</div>
+        {% endif %}
+        {% if tenant_design.get("company_address") %}
+          <div>{{ tenant_design.get("company_address") }}</div>
+        {% endif %}
+        {% if tenant_design.get("company_phone") %}
+          <div>📞 {{ tenant_design.get("company_phone") }}</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="right-meta">
+      <p>
+        <strong>Challan No:</strong> {{ data.get("challan_no", "-") }}<br>
+        <strong>Date:</strong> {{ data.get("created_at", generated_on) }}
+      </p>
+    </div>
+  </div>
+
+  <!-- CUSTOMER INFO -->
+  <h4 class="section-title">Customer Information</h4>
+  <div class="info">
+    <p><strong>Name:</strong> {{ data.get("customer_name", "-") }}</p>
+    <p><strong>Email:</strong> {{ data.get("email", "-") }}</p>
+    <p><strong>Contact:</strong> {{ data.get("contact_number", "-") }}</p>
+    <p><strong>City:</strong> {{ data.get("city", "-") }}</p>
+    <p><strong>Serial Number:</strong> {{ data.get("serial_number", "-") }}</p>
+  </div>
+
+  <!-- PROBLEM -->
+  <h4 class="section-title">Problem Description</h4>
+  <p>{{ data.get("problem", "—") }}</p>
+
+  <!-- ACCESSORIES & WARRANTY -->
+  <h4 class="section-title">Accessories & Warranty</h4>
+  <p><strong>Accessories:</strong> {{ accessories }}</p>
+  <p><strong>Warranty:</strong> {{ data.get("warranty", "—") }}</p>
+  <p><strong>Dispatch Through:</strong> {{ data.get("dispatch_through", "—") }}</p>
+
+  <!-- ITEMS -->
+  {% if data.get('items') %}
+  <h4 class="section-title">Items</h4>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Description</th>
+        <th>Quantity</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in data.get('items', []) %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ item.get("description", "—") }}</td>
+        <td>{{ item.get("quantity", 1) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  <!-- ATTACHED IMAGES -->
+  {% if images %}
+  <h4 class="section-title">Attached Images</h4>
+  <div class="images">
+    {% for img in images %}
+      <img src="{{ img }}" alt="attachment" />
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- QR CODE -->
+  {% if data.get('qr_code_url') %}
+  <div class="qr">
+    <img src="http://127.0.0.1:6001{{ data.get('qr_code_url') }}" alt="QR Code" />
+  </div>
+  {% endif %}
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <p>{{ tenant_design.get("footer_note", "Thank you for your business!") }}</p>
+  </div>
+</body>
+</html>

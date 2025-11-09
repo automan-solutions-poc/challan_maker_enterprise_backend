@@ -1,0 +1,15 @@
+flask
+flask-cors
+flask-mail
+psycopg2
+werkzeug
+bcrypt
+pyjwt
+pillow
+qrcode
+jinja2
+requests
+python-dotenv
+pdfkit          # for wkhtmltopdf-based PDF generation
+reportlab       # if used as alternative for PDF generation
+gunicorn        # for production deployment
