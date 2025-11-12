@@ -11,8 +11,8 @@ from jinja2 import Environment, FileSystemLoader
 # Ensure folders exist
 os.makedirs("static/qr_codes", exist_ok=True)
 os.makedirs("static/pdfs", exist_ok=True)
-baselocation_url="http://192.168.1.12:6001"
-# baselocation_url="http://127.0.0.1:6001"
+# baselocation_url="http://192.168.1.12:6001"
+baselocation_url="http://127.0.0.1:6001"
 # ----------------------------------------------------
 # 🔹 Generate QR Code and Save
 # ----------------------------------------------------
@@ -264,14 +264,16 @@ def generate_pdf(data, tenant_design):
                 image_urls.append(img)
 
         html_content = template.render(
-            tenant_design=tenant_design,
-            data=data,
-            accessories=accessories_str,  # ✅ FIXED HERE
-            images=image_urls,
-            logo_url=logo_url,
-            is_delivered=(data.get("status", "").lower() == "delivered"),
-            generated_on=datetime.now().strftime("%d/%m/%Y, %I:%M %p"),
-        )
+                tenant_design=tenant_design,
+                data=data,
+                accessories=accessories_str,
+                images=image_urls,
+                logo_url=logo_url,
+                terms_conditions=tenant_design.get("terms_conditions", ""),   # ✅ Added line
+                is_delivered=(data.get("status", "").lower() == "delivered"),
+                generated_on=datetime.now().strftime("%d/%m/%Y, %I:%M %p"),
+            )
+
 
         pdfkit.from_string(
             html_content,

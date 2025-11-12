@@ -435,7 +435,7 @@ def create_challan():
 
         # generate and save qr
         try:
-            qr_path = generate_and_save_qr(qr_payload)
+            qr_path = generate_and_save_qr(qr_record['challan_no'],qr_payload)
             # make absolute for DB and client
             qr_url = _absolute_static_url(qr_path) if qr_path else None
         except Exception as e:

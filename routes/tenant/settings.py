@@ -1,8 +1,7 @@
 from flask import Blueprint, request, jsonify
 from utils.db import get_db_connection
 from utils.auth import tenant_token_required
-import json
-import os
+import json, os
 from werkzeug.utils import secure_filename
 
 tenant_settings_bp = Blueprint("tenant_settings", __name__)
@@ -25,100 +24,149 @@ def safe_json(value):
         return {}
 
 # ------------------------------------
-# ✅ GET Tenant Settings (Branding + Challan + Tenant Email)
+# ✅ GET Tenant Settings (Branding + Challan + Tenant Email + Terms)
 # ------------------------------------
 @tenant_settings_bp.route("/settings", methods=["GET"])
 @tenant_token_required
 def get_tenant_settings():
-    """Fetch branding (design), challan settings, and tenant email (read-only)"""
+    """Fetch branding, challan, email, and terms conditions."""
     try:
         tenant_id = request.tenant.get("tenant_id")
 
         conn = get_db_connection()
         cur = conn.cursor()
-
-        # ✅ Fetch tenant settings + email from tenant table
         cur.execute("""
             SELECT 
                 ts.branding_config, 
                 ts.challan_config,
+                ts.terms_conditions,
                 t.email
             FROM tenants t
             LEFT JOIN tenant_settings ts ON ts.tenant_id = t.id
             WHERE t.id = %s
         """, (tenant_id,))
-
         row = cur.fetchone()
         cur.close()
         conn.close()
 
-        # ✅ Handle missing record gracefully
         if not row:
             return jsonify({
                 "branding": {},
                 "challan": {},
-                "tenant_email": None
+                "tenant_email": None,
+                "terms_conditions": ""
             }), 200
 
         branding = safe_json(row[0])
         challan = safe_json(row[1])
-        tenant_email = row[2] if len(row) > 2 else None
+        terms_conditions = row[2] or ""
+        tenant_email = row[3]
 
-        # ✅ Add email to branding as read-only field for frontend
-        if tenant_email:
-            branding["company_email"] = tenant_email
+        branding["company_email"] = tenant_email
 
         return jsonify({
             "branding": branding,
             "challan": challan,
-            "tenant_email": tenant_email
+            "tenant_email": tenant_email,
+            "terms_conditions": terms_conditions
         }), 200
 
     except Exception as e:
-        print(f"❌ Error fetching tenant settings: {type(e).__name__} - {e}")
+        print(f"❌ Error fetching tenant settings: {e}")
         return jsonify({"error": "Failed to fetch tenant settings"}), 500
 
 
 # ------------------------------------
-# ✅ UPDATE Tenant Settings
+# ✅ UPDATE Tenant Settings (Branding + Challan + Terms)
 # ------------------------------------
 @tenant_settings_bp.route("/settings", methods=["POST", "PUT"])
 @tenant_token_required
 def update_tenant_settings():
-    """Update tenant's branding and challan configuration"""
+    """Update tenant's branding, challan configuration, and terms."""
     try:
         tenant_id = request.tenant.get("tenant_id")
         data = request.get_json(silent=True) or {}
 
         branding = safe_json(data.get("branding"))
         challan = safe_json(data.get("challan"))
+        terms_conditions = data.get("terms_conditions", None)
 
-        if not branding and not challan:
-            return jsonify({"error": "Missing branding or challan data"}), 400
+        if not branding and not challan and not terms_conditions:
+            return jsonify({"error": "Missing data"}), 400
 
         conn = get_db_connection()
         cur = conn.cursor()
 
-        # ✅ UPSERT logic for tenant settings
         cur.execute("""
-            INSERT INTO tenant_settings (tenant_id, branding_config, challan_config, updated_at)
-            VALUES (%s, %s, %s, NOW())
+            INSERT INTO tenant_settings 
+                (tenant_id, branding_config, challan_config, terms_conditions, updated_at)
+            VALUES (%s, %s, %s, %s, NOW())
             ON CONFLICT (tenant_id)
             DO UPDATE SET 
                 branding_config = EXCLUDED.branding_config,
                 challan_config = EXCLUDED.challan_config,
+                terms_conditions = EXCLUDED.terms_conditions,
                 updated_at = NOW();
-        """, (tenant_id, json.dumps(branding), json.dumps(challan)))
+        """, (tenant_id, json.dumps(branding), json.dumps(challan), terms_conditions))
 
         conn.commit()
         cur.close()
         conn.close()
-
         return jsonify({"message": "✅ Settings updated successfully"}), 200
 
     except Exception as e:
-        print(f"❌ Error updating tenant settings: {type(e).__name__} - {e}")
+        print(f"❌ Error updating tenant settings: {e}")
         return jsonify({"error": "Failed to update tenant settings"}), 500
+
+
+# ------------------------------------
+# ✅ MANAGE Terms & Conditions SEPARATELY
+# ------------------------------------
+@tenant_settings_bp.route("/settings/terms", methods=["GET", "POST", "PUT", "DELETE"])
+@tenant_token_required
+def manage_terms_conditions():
+    """Add, update, view or delete tenant terms & conditions."""
+    try:
+        tenant_id = request.tenant.get("tenant_id")
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        if request.method == "GET":
+            cur.execute("SELECT terms_conditions FROM tenant_settings WHERE tenant_id=%s", (tenant_id,))
+            row = cur.fetchone()
+            cur.close()
+            conn.close()
+            return jsonify({
+                "terms_conditions": row[0] if row else ""
+            }), 200
+
+        elif request.method in ("POST", "PUT"):
+            data = request.get_json(silent=True) or {}
+            terms_text = data.get("terms_conditions", "").strip()
+            if not terms_text:
+                return jsonify({"error": "Terms text is required"}), 400
+
+            cur.execute("""
+                INSERT INTO tenant_settings (tenant_id, terms_conditions, updated_at)
+                VALUES (%s, %s, NOW())
+                ON CONFLICT (tenant_id)
+                DO UPDATE SET terms_conditions = EXCLUDED.terms_conditions, updated_at = NOW();
+            """, (tenant_id, terms_text))
+            conn.commit()
+            cur.close()
+            conn.close()
+            return jsonify({"message": "✅ Terms & Conditions saved successfully"}), 200
+
+        elif request.method == "DELETE":
+            cur.execute("UPDATE tenant_settings SET terms_conditions=NULL WHERE tenant_id=%s", (tenant_id,))
+            conn.commit()
+            cur.close()
+            conn.close()
+            return jsonify({"message": "🗑️ Terms removed successfully"}), 200
+
+    except Exception as e:
+        print(f"❌ Error managing terms: {e}")
+        return jsonify({"error": "Failed to manage terms"}), 500
 
 
 # ------------------------------------
@@ -127,21 +175,18 @@ def update_tenant_settings():
 @tenant_settings_bp.route("/settings", methods=["DELETE"])
 @tenant_token_required
 def delete_tenant_settings():
-    """Clear tenant design settings (useful for resetting template)"""
+    """Reset tenant design."""
     try:
         tenant_id = request.tenant.get("tenant_id")
-
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("DELETE FROM tenant_settings WHERE tenant_id=%s", (tenant_id,))
         conn.commit()
         cur.close()
         conn.close()
-
-        return jsonify({"message": "🗑️ Settings cleared successfully"}), 200
-
+        return jsonify({"message": "🗑️ Settings cleared"}), 200
     except Exception as e:
-        print(f"❌ Error deleting tenant settings: {type(e).__name__} - {e}")
+        print(f"❌ Error deleting settings: {e}")
         return jsonify({"error": "Failed to delete settings"}), 500
 
 
@@ -150,29 +195,26 @@ def delete_tenant_settings():
 # ------------------------------------
 UPLOAD_FOLDER = os.path.join(os.getcwd(), "static", "logos")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
 @upload_bp.route("/upload_logo", methods=["POST"])
 @tenant_token_required
 def upload_logo():
-    """Upload and save tenant logo, return full accessible URL"""
+    """Upload and save tenant logo, return full accessible URL."""
     try:
         tenant_id = request.tenant.get("tenant_id")
         file = request.files.get("logo")
-
         if not file:
             return jsonify({"error": "No file uploaded"}), 400
 
-        from werkzeug.utils import secure_filename
         filename = secure_filename(f"tenant_{tenant_id}_{file.filename}")
         upload_folder = os.path.join(os.getcwd(), "static", "logos")
         os.makedirs(upload_folder, exist_ok=True)
         file_path = os.path.join(upload_folder, filename)
         file.save(file_path)
 
-        # ✅ Construct full public URL
         base_url = request.host_url.rstrip('/')
         public_url = f"{base_url}/static/logos/{filename}"
 
-        # ✅ Update in DB
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("""
@@ -187,16 +229,10 @@ def upload_logo():
         cur.close()
         conn.close()
 
-        return jsonify({
-            "message": "✅ Logo uploaded successfully",
-            "logo_url": public_url
-        }), 200
-
+        return jsonify({"message": "✅ Logo uploaded", "logo_url": public_url}), 200
     except Exception as e:
         print("❌ Logo upload failed:", e)
-        return jsonify({"error": "Failed to upload logo"}), 500
-
-
+        return jsonify({"error": "Logo upload failed"}), 500
 
 @tenant_settings_bp.route("/design", methods=["GET"])
 @tenant_token_required
@@ -210,7 +246,7 @@ def get_merged_tenant_design():
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("""
-            SELECT branding_config, challan_config
+            SELECT branding_config, challan_config,terms_conditions
             FROM tenant_settings
             WHERE tenant_id=%s
         """, (tenant_id,))
@@ -230,8 +266,9 @@ def get_merged_tenant_design():
 
         branding = safe_json(row[0]) if row else {}
         challan = safe_json(row[1]) if row else {}
+        terms_conditions = row[2] if row else ""
 
-        merged = {**challan, **branding}
+        merged = {**challan, **branding,'terms_conditions':terms_conditions}
 
         return jsonify({"design": merged}), 200
 

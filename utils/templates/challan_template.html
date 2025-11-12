@@ -246,5 +246,13 @@
   <div class="footer">
     <p>{{ tenant_design.get("footer_note", "Thank you for your business!") }}</p>
   </div>
+
+  {% if tenant_design.get('terms_conditions') %}
+  <h4 class="section-title">Terms & Conditions</h4>
+  <div class="terms">
+    {{ tenant_design.get('terms_conditions') | safe }}
+  </div>
+{% endif %}
+
 </body>
 </html>
